@@ -276,9 +276,9 @@ namespace OpcenterExDsWebService.Odata
             return null;
         }
 
-        public string CreateSerialNumberCache(string token,string orderId,string serialNumber,string stepId,string stationId)
+        public string CreateSerialNumberCache(string token,string orderId,string serialNumber,string stepId,string stationId,string passId,string eventDatetime,string uniqId,string type)
         {
-            string json = OData4.SendCmd(token, "CreateSerialNumberCache", "{\"command\":{\"OrderId\":\"" + orderId + "\",SerialNumber:\"" + serialNumber + "\",Status:1,\"StepId\":\"" + stepId + "\",\"StationId\":\"" + stationId + "\"}}", DataScope.OpeApp);
+            string json = OData4.SendCmd(token, "CreateSerialNumberCache", "{\"command\":{\"OrderId\":\"" + orderId + "\",SerialNumber:\"" + serialNumber + "\",Status:1,\"StepId\":\"" + stepId + "\",\"StationId\":\"" + stationId + "\",\"EventDatetime\":\"" + eventDatetime + "\",\"PassId\":\"" + passId + "\",\"UniqId\":\"" + uniqId + "\",\"Type\":\"" + type + "\"}}", DataScope.OpeApp);
             JObject jb = JObject.Parse(json);
             JToken res_value;
             if (jb.TryGetValue("Error", out res_value))
@@ -365,6 +365,26 @@ namespace OpcenterExDsWebService.Odata
                 return res_value.ToString();
             }
             return null;
+        }
+
+        //http://siemensopds31/sit-svc/Application/AppU4DM/odata/WorkOrderOperation?$expand=WorkOrder($select=NId)&$filter=WorkOrder/NId eq 'WO-00000008'&$orderby=Sequence desc&$top=1&$select=TargetQuantity,ProducedQuantity
+        public string GetOrderProgress(string token, string OrderId)
+        {
+            string json = OData4.QueryData(token, "WorkOrderOperation", "?$expand=WorkOrder($select=NId)&$filter=WorkOrder/NId eq '"+OrderId+"'&$orderby=Sequence desc&$top=1&$select=TargetQuantity,ProducedQuantity");
+            JObject jb = JObject.Parse(json);
+            JToken res_value;
+            if (jb.TryGetValue("value", out res_value))
+            {
+                return res_value.ToString();
+            }
+            return null;
+        }
+
+        public DateTimeOffset ToDateTimeOffset(DateTime dateTime)
+        {
+            return dateTime.ToUniversalTime() <= DateTimeOffset.MinValue.UtcDateTime
+                       ? DateTimeOffset.MinValue
+                       : new DateTimeOffset(dateTime);
         }
     }
 }

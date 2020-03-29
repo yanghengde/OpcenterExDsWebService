@@ -89,6 +89,7 @@
     <Compile Include="ReturnValue.cs" />
     <Compile Include="ReturnValueBom.cs" />
     <Compile Include="WorkOrderOperation.cs" />
+    <Compile Include="WorkOrderProgress.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

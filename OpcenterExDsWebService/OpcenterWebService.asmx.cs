@@ -43,6 +43,12 @@ namespace OpcenterExDsWebService
             return OAuth2Token.Token;
         }
 
+        [WebMethod]
+        public string GetTokenValue()
+        {
+            return "Bearer " + GetToken();
+        }
+
         private void CreateToken(string tokenid)
         {
             SqlConnection sqlCn = new SqlConnection(connectString); //建立数据库实例..
@@ -182,6 +188,7 @@ namespace OpcenterExDsWebService
             string operationId;
             string userId;
             string type;
+            string eventDatetime;
             try
             {
                 JObject jb = JObject.Parse(input);
@@ -190,6 +197,7 @@ namespace OpcenterExDsWebService
                 operationId = jb["OperationId"].ToString();
                 userId = jb["UserId"].ToString();
                 type = jb["Type"].ToString();
+                eventDatetime = jb["EventDatetime"].ToString();
             }
             catch (Exception ex)
             {
@@ -197,6 +205,10 @@ namespace OpcenterExDsWebService
                 return JsonConvert.SerializeObject(rv);
             }
 
+            DateTime dt = DateTime.Parse(eventDatetime);
+
+            var datetimeoffset = bl.ToDateTimeOffset(dt);
+            eventDatetime = datetimeoffset.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 
             ReturnValue token = this.GetAccessToken();
             if (!token.Succeed)
@@ -248,6 +260,10 @@ namespace OpcenterExDsWebService
                 return JsonConvert.SerializeObject(rv);
             }
 
+            string wo = bl.GetWorkOrder(token.Result.ToString(), WO_ID);
+            JObject jwo = JObject.Parse(wo);
+            string OrderId = jwo["NId"].ToString();
+
             //start
             string start = bl.Start(token.Result.ToString(), _TerminalId, dm_mtu_id, op_id);
 
@@ -259,9 +275,6 @@ namespace OpcenterExDsWebService
                 rv.Message = jstart["ErrorMessage"].ToString();
                 return JsonConvert.SerializeObject(rv);
             }
-            string wo = bl.GetWorkOrder(token.Result.ToString(), WO_ID);
-            JObject jwo = JObject.Parse(wo);
-            string OrderId = jwo["NId"].ToString();
 
             if (type.ToLower() == "out")
             {
@@ -275,10 +288,9 @@ namespace OpcenterExDsWebService
                     rv.Message = jcomplete["ErrorMessage"].ToString();
                     return JsonConvert.SerializeObject(rv);
                 }
-
-                //insert current sn to temp
-                bl.CreateSerialNumberCache(token.Result.ToString(), OrderId, serialNumber, operationId, terminalId);
             }
+
+            bl.CreateSerialNumberCache(token.Result.ToString(), OrderId, serialNumber, operationId, terminalId, Guid.NewGuid().ToString(), eventDatetime, serialNumber + terminalId,type);
 
             string json4 = bl.GetOrderOperationProcessQty(token.Result.ToString(), op_id);
             JObject j4 = JObject.Parse(json4);
@@ -365,12 +377,12 @@ namespace OpcenterExDsWebService
             };
             string OrderId;
             string terminalId;
-            DateTimeOffset startTime;
+            string startTime;
             try {
                 JObject jb = JObject.Parse(input);
                 OrderId = jb["OrderId"].ToString();
                 terminalId = jb["TerminalId"].ToString();
-                startTime = DateTimeOffset.Parse(jb["StartTime"].ToString());
+                startTime = DateTimeOffset.Parse(jb["StartTime"].ToString()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             }
             catch (Exception ex)
             {
@@ -682,6 +694,11 @@ namespace OpcenterExDsWebService
             string mat_ids = bl.GetAssemblyMaterials(token.Result.ToString(), op_id);
 
             JArray ja = JArray.Parse(mat_ids);
+            if(ja.Count == 0)
+            {
+                rv.Message = string.Format("序列号[{0}]在工序[{1}]下没有关键件信息，无法执行组装", serialNumber,operationId);
+                return JsonConvert.SerializeObject(rv);
+            }
             string mat_id = ja[0]["NId"].ToString();
 
             //assembly
@@ -750,7 +767,7 @@ namespace OpcenterExDsWebService
 
             if(list.Count == 0)
             {
-                rv.Message = "未找到可使用的工单";
+                rv.Message = "未找到可使用的工单, 或者序列号未分配";
                 return JsonConvert.SerializeObject(rv);
             }
 
@@ -779,7 +796,7 @@ namespace OpcenterExDsWebService
                 orderId = jb["OrderId"].ToString();
                 quantity = int.Parse(jb["Quantity"].ToString());
                 materialId =jb["MaterialId"].ToString();
-                dueDate = jb["DueDate"].ToString();
+                dueDate = DateTimeOffset.Parse(jb["DueDate"].ToString()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             }
             catch (Exception ex)
             {
@@ -808,7 +825,7 @@ namespace OpcenterExDsWebService
             string plant = array[0]["Plant"].ToString();
             string finalMaterialID = array[0]["FinalMaterialId_Id"].ToString();
 
-            string createJson = bl.CreateOrder(token.Result.ToString(), orderId, processId, quantity, asplantid,finalMaterialID, plant, "2020-03-20T12:30:37.000Z");
+            string createJson = bl.CreateOrder(token.Result.ToString(), orderId, processId, quantity, asplantid,finalMaterialID, plant, dueDate);
 
             JObject jb0 = JObject.Parse(createJson);
             JToken res_value;
@@ -839,9 +856,9 @@ namespace OpcenterExDsWebService
         }
         #endregion
 
-        #region GetOrderInformation
+        #region GetOrderOperationProgress
         [WebMethod]
-        public string GetOrderInformation(string input)
+        public string GetOrderOperationProgress(string input)
         {
             ReturnValue rv = new ReturnValue
             {
@@ -873,6 +890,50 @@ namespace OpcenterExDsWebService
                     OrderId = array[j]["WorkOrder"]["NId"].ToString(),
                     ProducedQuantity = int.Parse(string.IsNullOrEmpty(array[j]["ProducedQuantity"].ToString()) ? "0" : array[j]["ProducedQuantity"].ToString()),
                     Sequence = array[j]["Sequence"].ToString(),
+                    Quantity = int.Parse(array[j]["TargetQuantity"].ToString())
+                };
+                list.Add(wo);
+            }
+
+            rv.Result = list;
+
+            rv.Succeed = true;
+
+            return JsonConvert.SerializeObject(rv);
+        }
+        #endregion
+
+        #region GetOrderProgress
+        [WebMethod]
+        public string GetOrderProgress(string input)
+        {
+            ReturnValue rv = new ReturnValue
+            {
+                Succeed = false
+            };
+
+            ReturnValue token = this.GetAccessToken();
+            if (!token.Succeed)
+            {
+                rv.Message = token.Message;
+                return JsonConvert.SerializeObject(rv);
+            }
+
+            string json = bl.GetOrderProgress(token.Result.ToString(), input);
+            JArray array = JArray.Parse(json);
+            if (array.Count == 0)
+            {
+                rv.Message = "未查询到工单相关的信息";
+                return JsonConvert.SerializeObject(rv);
+            }
+
+            IList<WorkOrderProgress> list = new List<WorkOrderProgress>();
+            for (int j = 0; j < array.Count; j++)
+            {
+                WorkOrderProgress wo = new WorkOrderProgress
+                {
+                    OrderId = array[j]["WorkOrder"]["NId"].ToString(),
+                    ProducedQuantity = int.Parse(string.IsNullOrEmpty(array[j]["ProducedQuantity"].ToString()) ? "0" : array[j]["ProducedQuantity"].ToString()),
                     Quantity = int.Parse(array[j]["TargetQuantity"].ToString())
                 };
                 list.Add(wo);
