@@ -839,9 +839,9 @@ namespace OpcenterExDsWebService
         #endregion
 
         [WebMethod]
-        public string GetMaxOrderId(string prekey)
+        public string GetMaxOrderId()
         {
-            ReturnValue rv = new ReturnValue
+            ReturnValueC rv = new ReturnValueC
             {
                 Succeed = false
             };
@@ -853,20 +853,13 @@ namespace OpcenterExDsWebService
                 return JsonConvert.SerializeObject(rv);
             }
 
-            string mxoid = bl.GetMaxOrderId(token.Result.ToString(),prekey);
-            string orderid = prefix+DateTime.Now.ToString("yyyyMMdd");
-            if (prekey.IndexOf(prefix) <= 0)
-            {
-                rv.Message = "请传入合法的字符";
-                return JsonConvert.SerializeObject(rv);
-            }
+            string orderid = prefix + DateTime.Now.ToString("yyyyMMdd");
+            string mxoid = bl.GetMaxOrderId(token.Result.ToString(), orderid);
+
             JArray ja = JArray.Parse(mxoid);
             
             if (ja.Count == 0)
             {
-                if (!orderid.Equals(prekey)){
-                    orderid = prekey;
-                }
                 orderid = orderid + "0001";
             }
             else
