@@ -92,18 +92,12 @@ namespace Siemens.MES.Net.CommonService
                 { "password", Password },
                 { "scope", "global" }}; 
             FormUrlEncodedContent fc = new FormUrlEncodedContent(fields);
-            HttpResponseMessage response = clientAuth.PostAsync(AuthRelativeURL, fc).Result;
+            //HttpResponseMessage response = clientAuth.PostAsync(AuthRelativeURL, fc).Result;
 
-            string result = response.Content.ReadAsStringAsync().Result;
-            JObject parsedJson = JObject.Parse(result);
-            token = parsedJson["access_token"].ToString();
-            RefreshToken = parsedJson["refresh_token"].ToString();
-            expiresInSeconds = parsedJson["expires_in"].Value<int>();
-
-            tokenTimer = new System.Timers.Timer((expiresInSeconds-60) *1000); //设置超时前60秒时触发事件
-            tokenTimer.Elapsed += Timer_Elapsed;
-            tokenTimer.Start();
-            isTokenTimerExpired = false;
+            //string result = response.Content.ReadAsStringAsync().Result;
+            //JObject parsedJson = JObject.Parse(result);
+            token = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjFGMjlCMDNEOEMwRjYxNzNEMzQ5MkYwMEJEMTI4QzQ5QjA3MkRBNUYiLCJ4NXQiOiJIeW13UFl3UFlYUFRTUzhBdlJLTVNiQnkybDgiLCJ0eXAiOiJKV1QifQ.eyJ1bmlxdWVfbmFtZSI6IkNOPUZhd1Rva2VuQ2VydCwgVD1TaW1hdGljSVQgVUEgRm91bmRhdGlvbiIsImNlcnR0aHVtYnByaW50IjoiMUYyOUIwM0Q4QzBGNjE3M0QzNDkyRjAwQkQxMjhDNDlCMDcyREE1RiIsInVybjpyZWFsbSI6InguNTA5IiwibmJmIjoxNTkxODU2MTU3LCJleHAiOjE1OTk4MDQ5NTcsImlhdCI6MTU5MTg1NjE1NywiaXNzIjoidXJuOnVuaWZpZWRvYXV0aCIsImF1ZCI6InVybjp1bmlmaWVkIn0.tY-UtqmjzXwt3qYvqBwDxeo73b0aDfSH3VtKyfrjbuFUcY2MQ7DAweIbRsFwbQc00-M9SGgcuyLFGXvcoCN9IMoGdAmiGYtlBvVEl_asWVEMlomCBjdN0BKSPUKmfiPC27rlCZ4WDQUvk4ygUiFpcwkFL499O92VZyrS62gyaV7wbuDLmnK7-IBkLLdryOo75K5vn-a7fWoZbB7mouu2E96827_ml6olUXNdm_bJAlmlKhC7DdU3k-w2Y72jyNBF4OrWMQpf5VqLmYND8xIbP89_x2Nk1bib9eqAaEXwoU1K76FRXopvEY349CquFr63pu2p05xT7vqE_KBtMqvAIg";
+            //RefreshToken = parsedJson["refresh_token"].ToString();
         }
 
         private static void Timer_Elapsed(object sender, ElapsedEventArgs e)

@@ -333,9 +333,9 @@ namespace OpcenterExDsWebService.Odata
         //	http://siemensopds31/sit-svc/Application/AppU4DM/odata/UADMCreateWorkOrderFromProcess
         //{"command":{"NId":"WO-00000004","ProcessId":"8d545bf2-aa96-47e9-8a49-5a942269173a","ProductionTypeNId":"Serialized","Quantity":10,"AsPlannedId":"2053cf50-4d08-49e1-b712-99581e5d91f3","FinalMaterialId":"9c557480-cc49-4548-860e-dce4643c2f67","Plant":"SIEMENS-ELEC","DueDate":"2020-03-20T12:30:37.000Z"}}
         //{"@odata.context":"http://siemensopds31/sit-svc/application/AppU4DM/odata/$metadata#Siemens.SimaticIT.U4DM.AppU4DM.AppU4DM.DMPOMModel.Commands.UADMCreateWorkOrderFromProcessResponse","Succeeded":true,"Id":"546da152-8d86-4de9-a3fe-02818cd61eff","Error":{"ErrorCode":0,"ErrorMessage":""},"SitUafExecutionDetail":null}//
-        public string CreateOrder(string token, string orderId, string processId, int quantity, string asPlannedId,string finalMaterialId,string plant,string duetime)
+        public string CreateOrder(string token, string orderId, string processId, int quantity, string asPlannedId,string finalMaterialId,string plant,string duetime,string color)
         {
-            string json = OData4.SendCmd(token, "UADMCreateWorkOrderFromProcess", "{\"command\":{\"NId\":\""+ orderId + "\",\"ProcessId\":\""+processId+"\",\"ProductionTypeNId\":\"Serialized\",\"Quantity\":"+ quantity + ",\"AsPlannedId\":\""+ asPlannedId + "\",\"FinalMaterialId\":\""+ finalMaterialId + "\",\"Plant\":\""+plant+ "\",\"DueDate\":\"" + duetime + "\"}}");
+            string json = OData4.SendCmd(token, "UADMCreateWorkOrderFromProcess", "{\"command\":{\"NId\":\""+ orderId + "\",\"ProcessId\":\""+processId+"\",\"ProductionTypeNId\":\"Serialized\",\"Quantity\":"+ quantity + ",\"AsPlannedId\":\""+ asPlannedId + "\",\"FinalMaterialId\":\""+ finalMaterialId + "\",\"Plant\":\""+plant+ "\",\"ERPOrder\":\""+ color + "\",\"DueDate\":\"" + duetime + "\"}}");
            
             return json;
         }
@@ -354,10 +354,37 @@ namespace OpcenterExDsWebService.Odata
             return null;
         }
 
+        //http://siemensopds32/sit-svc/Application/AppU4DM/odata/UADMSetWorkOrderForScheduling
+        //{"command":{"WorkOrderId":"2cbf2a97-833c-4315-b607-9ad30b881305","WorkOrderNId":"WO-00000004"}}
+        public string UADMSetWorkOrderForScheduling(string token, string wo_id, string userId)
+        {
+            string json = OData4.SendCmd(token, "UADMSetWorkOrderForScheduling", "{\"command\":{\"WorkOrderId\":\"" + wo_id+ "\",\"UserId\":\"" + userId + "\"}}");
+            JObject jb = JObject.Parse(json);
+            JToken res_value;
+            if (jb.TryGetValue("Error", out res_value))
+            {
+                return res_value.ToString();
+            }
+            return null;
+        }
+
         //http://siemensopds31/sit-svc/Application/AppU4DM/odata/WorkOrderOperation?$expand=WorkOrder($select=NId)&$filter=WorkOrder/NId eq 'WO-00000008'&$orderby=Sequence asc&$select=Name,Description,Sequence,TargetQuantity,ProducedQuantity
         public string GetOrderInformation(string token, string OrderId)
         {
             string json = OData4.QueryData(token, "WorkOrderOperation", "?$expand=WorkOrder($select=NId)&$filter=WorkOrder/NId eq '"+OrderId+"'&$orderby=Sequence asc&$select=Name,Description,Sequence,TargetQuantity,ProducedQuantity");
+            JObject jb = JObject.Parse(json);
+            JToken res_value;
+            if (jb.TryGetValue("value", out res_value))
+            {
+                return res_value.ToString();
+            }
+            return null;
+        }
+
+        //http://SiemensOpds32/sit-svc/Application/AppU4DM/odata/WorkOrder?$select=NId&$filter=startswith(NId,'KI202007')&$orderby=NId desc
+        public string GetMaxOrderId(string token, string prekey)
+        {
+            string json = OData4.QueryData(token, "WorkOrder", "?$select=NId&$filter=startswith(NId,'"+prekey+ "')&$orderby=NId desc&$top=1");
             JObject jb = JObject.Parse(json);
             JToken res_value;
             if (jb.TryGetValue("value", out res_value))

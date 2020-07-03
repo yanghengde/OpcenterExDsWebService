@@ -24,8 +24,6 @@ namespace OpcenterExDsWebService
     // [System.Web.Script.Services.ScriptService]
     public class OpcenterWebService : System.Web.Services.WebService
     {
-        private string connectString = ConfigurationManager.AppSettings["connectString"];
-        private int connectReset = int.Parse(ConfigurationManager.AppSettings["connectReset"]);//秒
         private string userName = ConfigurationManager.AppSettings["userName"];
         private string password = ConfigurationManager.AppSettings["password"];
         private string baseURL = ConfigurationManager.AppSettings["baseURL"];
@@ -40,79 +38,9 @@ namespace OpcenterExDsWebService
             OAuth2Token.Initialize(userName, password, domain, baseURL);
             OData4.Initialize(baseURL);
 
-            return OAuth2Token.Token;
-        }
+            //return OAuth2Token.Token;
 
-        [WebMethod]
-        public string GetTokenValue()
-        {
-            return "Bearer " + GetToken();
-        }
-
-        private void CreateToken(string tokenid)
-        {
-            SqlConnection sqlCn = new SqlConnection(connectString); //建立数据库实例..
-            try { 
-                sqlCn.Open();
-                SqlCommand sqlCm = new SqlCommand();
-                sqlCm.CommandText = string.Format("delete from TokenTable; Insert into TokenTable(TokenId,LastupdatedTime) values('{0}','{1}')", tokenid,DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                sqlCm.Connection = sqlCn;
-                sqlCm.ExecuteNonQuery(); //执行sql语句...
-            }catch(Exception ex)
-            {
-                throw ex;
-            }
-            finally { 
-                sqlCn.Close();
-            }
-        }
-
-        private DataTable GetExistToken()
-        {
-            SqlConnection sqlCn = new SqlConnection(connectString); //建立数据库实例..
-            try
-            {
-                sqlCn.Open();
-                SqlCommand sqlCm = new SqlCommand();
-
-                DataSet DataSet = new DataSet();
-                SqlDataAdapter DataAdapter = new SqlDataAdapter("select * from TokenTable", sqlCn);
-                DataAdapter.Fill(DataSet, "DataTable");
-
-                return DataSet.Tables["DataTable"];
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-            finally
-            {
-                sqlCn.Close();
-            }
-        }
-
-        private DataTable DeleteToken()
-        {
-            SqlConnection sqlCn = new SqlConnection(connectString); //建立数据库实例..
-            try
-            {
-                sqlCn.Open();
-                SqlCommand sqlCm = new SqlCommand();
-
-                DataSet DataSet = new DataSet();
-                SqlDataAdapter DataAdapter = new SqlDataAdapter("select * from TokenTable", sqlCn);
-                DataAdapter.Fill(DataSet, "DataTable");
-
-                return DataSet.Tables["DataTable"];
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-            finally
-            {
-                sqlCn.Close();
-            }
+            return ConfigurationManager.AppSettings["token"];
         }
 
         public ReturnValue GetAccessToken()
@@ -123,54 +51,6 @@ namespace OpcenterExDsWebService
 
             ret.Succeed = true;ret.Result = token111;
             return ret;
-            //
-            ret.Succeed = false;
-            try
-            {
-                DataTable dt = GetExistToken();
-                if(dt.Rows.Count == 0)
-                {
-                   string token = this.GetToken();
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        ret.Succeed = false;
-                        ret.Message =string.Format("生产token失败，参数为{0},{1},{2},{3}",userName,password,baseURL,domain);
-                        return ret;
-                    }
-
-                    CreateToken(token);
-
-                    ret.Succeed = true;
-                    ret.Result = token;
-                    return ret;
-                }
-                else
-                {
-                    DataRow dr = dt.Rows[0];
-                    DateTimeOffset dateTime = DateTimeOffset.Parse(dr["LastUpdatedTime"].ToString());
-                    DateTimeOffset nowTime = DateTimeOffset.Now;
-                    long time = (nowTime.Ticks - dateTime.Ticks)/10000000;
-                    if(time > connectReset)
-                    {
-                        string token = this.GetToken();
-                        CreateToken(token);
-                        ret.Succeed = true;
-                        ret.Result = token;
-                        return ret;
-                    }
-                    else
-                    {
-                        ret.Succeed = true;
-                        ret.Result = dr["TokenId"];
-                        return ret;
-                    }
-                }
-            }catch(Exception ex)
-            {
-                ret.Succeed = false;
-                ret.Message = ex.Message;
-                return ret;
-            }
         }
         #endregion
 
@@ -424,7 +304,7 @@ namespace OpcenterExDsWebService
                 return JsonConvert.SerializeObject(rv);
             }
 
-            if (orderStatus == "Edit")
+            if (orderStatus == "Edit" || orderStatus == "ReadyForScheduling")
             {
                 string json = bl.ReleaseOrder(token.Result.ToString(), CheckOrder.Result.ToString(), OrderId);
                 JObject jb1 = JObject.Parse(json);
@@ -789,6 +669,7 @@ namespace OpcenterExDsWebService
             string orderId;
             int quantity;
             string materialId;
+            string color;
             string dueDate;
             try
             {
@@ -796,6 +677,7 @@ namespace OpcenterExDsWebService
                 orderId = jb["OrderId"].ToString();
                 quantity = int.Parse(jb["Quantity"].ToString());
                 materialId =jb["MaterialId"].ToString();
+                color = jb["Color"].ToString();
                 dueDate = DateTimeOffset.Parse(jb["DueDate"].ToString()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             }
             catch (Exception ex)
@@ -825,7 +707,7 @@ namespace OpcenterExDsWebService
             string plant = array[0]["Plant"].ToString();
             string finalMaterialID = array[0]["FinalMaterialId_Id"].ToString();
 
-            string createJson = bl.CreateOrder(token.Result.ToString(), orderId, processId, quantity, asplantid,finalMaterialID, plant, dueDate);
+            string createJson = bl.CreateOrder(token.Result.ToString(), orderId, processId, quantity, asplantid,finalMaterialID, plant, dueDate,color);
 
             JObject jb0 = JObject.Parse(createJson);
             JToken res_value;
@@ -847,6 +729,15 @@ namespace OpcenterExDsWebService
             if (errorcode1 != 0)
             {
                 rv.Message = jb2["ErrorMessage"].ToString();
+                return JsonConvert.SerializeObject(rv);
+            }
+
+            string jsonsch = bl.UADMSetWorkOrderForScheduling(token.Result.ToString(), wo_id, userName);
+            JObject jb3 = JObject.Parse(jsns);
+            int errorcode2 = int.Parse(jb3["ErrorCode"].ToString());
+            if (errorcode2 != 0)
+            {
+                rv.Message = jb3["ErrorMessage"].ToString();
                 return JsonConvert.SerializeObject(rv);
             }
 
@@ -946,5 +837,27 @@ namespace OpcenterExDsWebService
             return JsonConvert.SerializeObject(rv);
         }
         #endregion
+
+        [WebMethod]
+        public string GetMaxOrderId(string prekey)
+        {
+            ReturnValue rv = new ReturnValue
+            {
+                Succeed = false
+            };
+
+            ReturnValue token = this.GetAccessToken();
+            if (!token.Succeed)
+            {
+                rv.Message = token.Message;
+                return JsonConvert.SerializeObject(rv);
+            }
+
+            string mxoid = bl.GetMaxOrderId(token.Result.ToString(),prekey);
+            rv.Succeed = true;
+            rv.Result = mxoid;
+
+            return JsonConvert.SerializeObject(rv);
+        }
     }
 }
