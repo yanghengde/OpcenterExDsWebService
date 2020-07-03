@@ -854,8 +854,31 @@ namespace OpcenterExDsWebService
             }
 
             string mxoid = bl.GetMaxOrderId(token.Result.ToString(),prekey);
+            string orderid = prefix+DateTime.Now.ToString("yyyyMMdd");
+            if (prekey.IndexOf(prefix) <= 0)
+            {
+                rv.Message = "请传入合法的字符";
+                return JsonConvert.SerializeObject(rv);
+            }
+            JArray ja = JArray.Parse(mxoid);
+            
+            if (ja.Count == 0)
+            {
+                if (!orderid.Equals(prekey)){
+                    orderid = prekey;
+                }
+                orderid = orderid + "0001";
+            }
+            else
+            {
+                string oid = ja[0]["NId"].ToString();
+                string inscre = oid.Substring(oid.Length - 4, 4);
+                int i = int.Parse(inscre);
+                int now = i + 1;
+                orderid = orderid + now.ToString().PadLeft(4, '0');
+            }
             rv.Succeed = true;
-            rv.Result = mxoid;
+            rv.Result = orderid;
 
             return JsonConvert.SerializeObject(rv);
         }
